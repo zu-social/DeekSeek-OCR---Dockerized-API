@@ -150,7 +150,6 @@ class PDFToCustomPromptProcessor:
             url = f"{self.api_base_url}{endpoint}"
             
             logger.info(f"Processing PDF with API endpoint: {url}")
-            logger.info(f"Using custom prompt: {self.custom_prompt}")
             
             # Prepare the file for multipart/form-data upload
             with open(pdf_path, 'rb') as pdf_file:
@@ -165,11 +164,11 @@ class PDFToCustomPromptProcessor:
                     result = response.json()
                     logger.info(f"Successfully processed PDF using endpoint: {endpoint}")
                     
-                    # Extract raw markdown content from BatchOCRResponse
+                    # Extract markdown content from BatchOCRResponse
                     if isinstance(result, dict):
                         # Check if this is a batch response with results
                         if "results" in result and isinstance(result["results"], list):
-                            # Combine all page results into a single markdown without post-processing
+                            # Combine all page results into a single markdown
                             markdown_content = ""
                             for page_result in result["results"]:
                                 if isinstance(page_result, dict) and "result" in page_result:

@@ -15,6 +15,7 @@ COPY DeepSeek-OCR/DeepSeek-OCR-master/DeepSeek-OCR-vllm/ ./DeepSeek-OCR-vllm/
 # Copy custom files to replace the originals (transparent replacement approach)
 COPY custom_config.py ./DeepSeek-OCR-vllm/config.py
 COPY custom_image_process.py ./DeepSeek-OCR-vllm/process/image_process.py
+COPY custom_deepseek_ocr.py ./DeepSeek-OCR-vllm/deepseek_ocr.py
 
 # Copy custom run scripts to replace the originals
 COPY custom_run_dpsk_ocr_pdf.py ./DeepSeek-OCR-vllm/run_dpsk_ocr_pdf.py

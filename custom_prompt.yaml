@@ -16,4 +16,6 @@
 
 # prompt: '<image>\n<|grounding|>Convert the document to markdown.'
 
-prompt: '<image>\n<|grounding|>Convert the document to markdown.  Double check table structures.'
+prompt: |-
+  <image>
+  <|grounding|>Convert the document to markdown.

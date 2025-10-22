@@ -141,41 +141,18 @@ def pdf_to_images_high_quality(pdf_data: bytes, dpi: int = 144) -> List[Image.Im
     
     return images
 
-def validate_prompt(prompt: str) -> str:
-    """Validate and fix prompt format if needed"""
-    print(f"[DEBUG] Validating prompt: {repr(prompt)}")
-    
-    if not prompt.startswith('<image>'):
-        print(f"[WARNING] Prompt doesn't start with <image>, prepending: {repr(prompt)}")
-        prompt = f'<image>\n{prompt}'
-    
-    # Check if it's supposed to be a grounding prompt
-    if '<|' in prompt and '|>' not in prompt:
-        print(f"[WARNING] Prompt contains incomplete special tokens: {repr(prompt)}")
-    
-    # Check for common grounding patterns
-    if '<|grounding|>' in prompt:
-        print(f"[DEBUG] Prompt is a grounding prompt")
-    elif '<|' in prompt:
-        print(f"[WARNING] Prompt has special tokens but not <|grounding|>: {repr(prompt)}")
-    
-    print(f"[DEBUG] Validated prompt: {repr(prompt)}")
-    return prompt
-
 def process_single_image(image: Image.Image, prompt: str = PROMPT) -> str:
     """Process a single image with DeepSeek-OCR using the specified prompt"""
     print(f"[DEBUG] process_single_image called with prompt: {repr(prompt)}")
     print(f"[DEBUG] Prompt length: {len(prompt)} characters")
     print(f"[DEBUG] Prompt starts with <image>: {prompt.startswith('<image>')}")
     
-    # Validate the prompt format
-    validated_prompt = validate_prompt(prompt)
-    
     # Create request format for vLLM
     request_item = {
-        "prompt": validated_prompt,
+        "prompt": prompt,
         "multi_modal_data": {
             "image": DeepseekOCRProcessor().tokenize_with_images(
+                prompt=prompt,
                 images=[image],
                 bos=True,
                 eos=True,
@@ -247,9 +224,6 @@ async def process_image_endpoint(file: UploadFile = File(...), prompt: Optional[
         print(f"[DEBUG] Image endpoint selected prompt: {repr(use_prompt)}")
         print(f"[DEBUG] Using custom prompt: {prompt is not None}")
         
-        # Validate and fix prompt format
-        use_prompt = validate_prompt(use_prompt)
-        
         # Process with DeepSeek-OCR
         print(f"[DEBUG] Sending image to DeepSeek-OCR...")
         result = process_single_image(image, use_prompt)
@@ -297,9 +271,6 @@ async def process_pdf_endpoint(file: UploadFile = File(...), prompt: Optional[st
         use_prompt = prompt if prompt else PROMPT
         print(f"[DEBUG] PDF endpoint selected prompt: {repr(use_prompt)}")
         print(f"[DEBUG] Using custom prompt: {prompt is not None}")
-        
-        # Validate and fix prompt format
-        use_prompt = validate_prompt(use_prompt)
         
         # Process each page
         results = []

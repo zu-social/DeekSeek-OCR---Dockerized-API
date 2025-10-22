@@ -377,7 +377,6 @@ class PDFToCustomPromptProcessor:
             url = f"{self.api_base_url}{endpoint}"
             
             logger.info(f"Processing PDF with API endpoint: {url}")
-            logger.info(f"Using custom prompt: {self.custom_prompt}")
             
             # Prepare the file for multipart/form-data upload
             with open(pdf_path, 'rb') as pdf_file:

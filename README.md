@@ -26,7 +26,7 @@ python pdf_to_markdown_processor.py
 
 ### Hardware Requirements
 - **NVIDIA GPU** with CUDA 11.8+ support
-- **GPU Memory**: Minimum 12GB VRAM (~9GB for model)
+- **GPU Memory**: Minimum 16GB VRAM (recommended: 40GB+ A100)
 - **System RAM**: Minimum 32GB (recommended: 64GB+)
 - **Storage**: 50GB+ free space for model and containers
 
@@ -475,6 +475,86 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
 
 ## ⚙️ Configuration
 
+### Custom Configuration and Critical Fixes
+
+This project includes custom files that replace the original DeepSeek-OCR library code to fix critical issues and provide enhanced functionality. These replacements are applied transparently during the Docker build process.
+
+#### 🚨 Critical Prompt Parameter Fix
+
+**Issue**: The original DeepSeek-OCR library has a bug where the `tokenize_with_images()` method is called without the required `prompt` parameter during model initialization, causing server startup failures.
+
+**Solution**: Custom run scripts have been created to properly handle the prompt parameter and prevent startup errors.
+
+#### Custom Files and Their Purpose
+
+The following custom files in the project root replace their counterparts during Docker build:
+
+- **`custom_config.py`**: Custom configuration with customizable default prompt and settings
+- **`custom_image_process.py`**: Fixed version of the image processing module that handles the prompt parameter correctly
+- **`custom_run_dpsk_ocr_pdf.py`**: Enhanced PDF script that accepts `--prompt` argument and fixes the initialization issue
+- **`custom_run_dpsk_ocr_image.py`**: Enhanced image script that accepts `--prompt` argument and fixes the initialization issue
+- **`custom_run_dpsk_ocr_eval_batch.py`**: Enhanced batch script that accepts `--prompt` argument and fixes the initialization issue
+
+These custom files are automatically copied over the original library files during the Docker build process, ensuring the fixes are applied without requiring manual intervention.
+
+#### Using Custom Configuration
+
+1. **Edit the Default Prompt**:
+   ```python
+   # Edit custom_config.py
+   PROMPT = '<image>\n<|grounding|>Your custom default prompt here.'
+   ```
+
+2. **Use Custom Prompts with Direct Scripts**:
+   ```bash
+   # Using default prompt from custom_config.py
+   python custom_run_dpsk_ocr_pdf.py --input your_file.pdf --output output_dir
+   
+   # Using custom prompt via command line
+   python custom_run_dpsk_ocr_pdf.py --prompt "<image>\n<|grounding|>Extract tables as CSV." --input your_file.pdf
+   ```
+
+3. **Use Custom Prompts with API**:
+   ```bash
+   # Using default prompt
+   curl -X POST "http://localhost:8000/ocr/pdf" -F "file=@your_file.pdf"
+   
+   # Using custom prompt
+   curl -X POST "http://localhost:8000/ocr/pdf" -F "file=@your_file.pdf" -F "prompt=<image>\n<|grounding|>Your custom prompt here."
+   ```
+
+4. **Build and Run**:
+   ```bash
+   # Rebuild with custom configuration and fixes
+   docker-compose build
+   
+   # Start the container
+   docker-compose up -d
+   ```
+
+#### Docker Build Process
+
+The Dockerfile automatically applies the custom files during the build process:
+
+```dockerfile
+# Copy custom files to replace the originals (transparent replacement approach)
+COPY custom_config.py ./DeepSeek-OCR-vllm/config.py
+COPY custom_image_process.py ./DeepSeek-OCR-vllm/process/image_process.py
+
+# Copy custom run scripts to replace the originals
+COPY custom_run_dpsk_ocr_pdf.py ./DeepSeek-OCR-vllm/run_dpsk_ocr_pdf.py
+COPY custom_run_dpsk_ocr_image.py ./DeepSeek-OCR-vllm/run_dpsk_ocr_image.py
+COPY custom_run_dpsk_ocr_eval_batch.py ./DeepSeek-OCR-vllm/run_dpsk_ocr_eval_batch.py
+```
+
+This transparent replacement approach ensures that:
+- The critical prompt parameter fix is applied
+- Custom configuration options are available
+- No manual modification of the original library code is required
+- The fixes persist across container rebuilds
+
+For detailed documentation, see **`CUSTOM_CONFIG_README.md`**.
+
 ### Environment Variables
 
 Edit `docker-compose.yml` to adjust these settings:
@@ -560,6 +640,29 @@ curl -X POST "http://localhost:8000/ocr/pdf" \
   -F "file=@data/your_document.pdf"
 ```
 
+#### 6. Prompt Parameter Error (Fixed)
+If you encounter this error during server startup:
+```
+TypeError: DeepseekOCRProcessor.tokenize_with_images() missing 1 required positional argument: 'prompt'
+```
+
+This error has been fixed with the custom files included in the Docker build. If you still see it:
+
+1. **Ensure you're using the updated Dockerfile** (includes custom run scripts)
+2. **Rebuild the container completely**:
+   ```bash
+   docker-compose down
+   docker-compose build --no-cache
+   docker-compose up -d
+   ```
+3. **Verify the fix is applied**:
+   ```bash
+   docker-compose exec deepseek-ocr ls -la /app/DeepSeek-OCR-vllm/run_dpsk_ocr_*.py
+   # These should show recent timestamps from the build
+   ```
+
+The fix ensures that the `tokenize_with_images()` method is called with the correct prompt parameter during model initialization.
+
 ### Debug Mode
 
 For debugging, you can run the container with additional tools:
@@ -595,14 +698,21 @@ print(f'Model exists: {os.path.exists(MODEL_PATH)}')
 ```
 DeepSeek-OCR/
 ├── README.md                              # This file
+├── CUSTOM_CONFIG_README.md                # Custom configuration documentation
 ├── pdf_to_markdown_processor.py           # Basic markdown conversion
 ├── pdf_to_markdown_processor_enhanced.py  # Enhanced markdown with post-processing
 ├── pdf_to_ocr_enhanced.py                # OCR text extraction
 ├── pdf_to_custom_prompt.py                # Custom prompt processing (raw)
 ├── pdf_to_custom_prompt_enhanced.py       # Custom prompt with post-processing
 ├── custom_prompt.yaml                     # Configuration for custom prompts
+├── custom_config.py                       # Custom configuration (replaces original config.py)
+├── custom_image_process.py                # Fixed image processing (replaces original)
+├── custom_run_dpsk_ocr_pdf.py            # Custom PDF script with prompt support (replaces original)
+├── custom_run_dpsk_ocr_image.py          # Custom image script with prompt support (replaces original)
+├── custom_run_dpsk_ocr_eval_batch.py     # Custom batch script with prompt support (replaces original)
+├── test_custom_config.py                  # Test script for custom configuration
 ├── start_server.py                        # FastAPI server
-├── Dockerfile                             # Docker container definition
+├── Dockerfile                             # Docker container definition (includes custom files)
 ├── docker-compose.yml                     # Docker compose configuration
 ├── build.bat                              # Windows build script
 ├── data/                                  # Input/output directory for PDFs
@@ -610,6 +720,8 @@ DeepSeek-OCR/
 │   └── *.md                               # Generated markdown files
 ├── models/                                # Model weights directory
 └── DeepSeek-OCR/                          # DeepSeek-OCR source code
+    └── DeepSeek-OCR-master/
+        └── DeepSeek-OCR-vllm/            # Original library files (replaced during build)
 ```
 
 ---
