@@ -141,11 +141,39 @@ def pdf_to_images_high_quality(pdf_data: bytes, dpi: int = 144) -> List[Image.Im
     
     return images
 
+def validate_prompt(prompt: str) -> str:
+    """Validate and fix prompt format if needed"""
+    print(f"[DEBUG] Validating prompt: {repr(prompt)}")
+    
+    if not prompt.startswith('<image>'):
+        print(f"[WARNING] Prompt doesn't start with <image>, prepending: {repr(prompt)}")
+        prompt = f'<image>\n{prompt}'
+    
+    # Check if it's supposed to be a grounding prompt
+    if '<|' in prompt and '|>' not in prompt:
+        print(f"[WARNING] Prompt contains incomplete special tokens: {repr(prompt)}")
+    
+    # Check for common grounding patterns
+    if '<|grounding|>' in prompt:
+        print(f"[DEBUG] Prompt is a grounding prompt")
+    elif '<|' in prompt:
+        print(f"[WARNING] Prompt has special tokens but not <|grounding|>: {repr(prompt)}")
+    
+    print(f"[DEBUG] Validated prompt: {repr(prompt)}")
+    return prompt
+
 def process_single_image(image: Image.Image, prompt: str = PROMPT) -> str:
     """Process a single image with DeepSeek-OCR using the specified prompt"""
+    print(f"[DEBUG] process_single_image called with prompt: {repr(prompt)}")
+    print(f"[DEBUG] Prompt length: {len(prompt)} characters")
+    print(f"[DEBUG] Prompt starts with <image>: {prompt.startswith('<image>')}")
+    
+    # Validate the prompt format
+    validated_prompt = validate_prompt(prompt)
+    
     # Create request format for vLLM
     request_item = {
-        "prompt": prompt,
+        "prompt": validated_prompt,
         "multi_modal_data": {
             "image": DeepseekOCRProcessor().tokenize_with_images(
                 images=[image],
@@ -156,13 +184,22 @@ def process_single_image(image: Image.Image, prompt: str = PROMPT) -> str:
         }
     }
     
+    print(f"[DEBUG] Request item prompt: {repr(request_item['prompt'])}")
+    print(f"[DEBUG] Request item keys: {list(request_item.keys())}")
+    print(f"[DEBUG] Multi-modal data type: {type(request_item['multi_modal_data'])}")
+    
     # Generate with vLLM
+    print(f"[DEBUG] Sending request to vLLM...")
     outputs = llm.generate([request_item], sampling_params=sampling_params)
     result = outputs[0].outputs[0].text
+    
+    print(f"[DEBUG] Model output (first 100 chars): {repr(result[:100])}")
+    print(f"[DEBUG] Model output length: {len(result)} characters")
     
     # Clean up result
     if '<｜end▁of▁sentence｜>' in result:
         result = result.replace('<｜end▁of▁sentence｜>', '')
+        print(f"[DEBUG] Removed end-of-sentence tokens")
     
     return result
 
@@ -191,17 +228,32 @@ async def health_check():
 async def process_image_endpoint(file: UploadFile = File(...), prompt: Optional[str] = Form(None)):
     """Process a single image file with optional custom prompt"""
     try:
+        print(f"[DEBUG] Image endpoint called for file: {file.filename}")
+        
         # Read image data
         image_data = await file.read()
+        print(f"[DEBUG] Read {len(image_data)} bytes of image data")
         
         # Convert to PIL Image
         image = Image.open(io.BytesIO(image_data)).convert('RGB')
+        print(f"[DEBUG] Converted to PIL Image, size: {image.size}")
+        
+        # Debug logging
+        print(f"[DEBUG] Received prompt parameter: {repr(prompt)}")
+        print(f"[DEBUG] Default PROMPT from config: {repr(PROMPT)}")
         
         # Use provided prompt or default
         use_prompt = prompt if prompt else PROMPT
+        print(f"[DEBUG] Image endpoint selected prompt: {repr(use_prompt)}")
+        print(f"[DEBUG] Using custom prompt: {prompt is not None}")
+        
+        # Validate and fix prompt format
+        use_prompt = validate_prompt(use_prompt)
         
         # Process with DeepSeek-OCR
+        print(f"[DEBUG] Sending image to DeepSeek-OCR...")
         result = process_single_image(image, use_prompt)
+        print(f"[DEBUG] OCR complete, output length: {len(result)}")
         
         return OCRResponse(
             success=True,
@@ -210,6 +262,7 @@ async def process_image_endpoint(file: UploadFile = File(...), prompt: Optional[
         )
         
     except Exception as e:
+        print(f"[ERROR] Image endpoint failed: {str(e)}")
         return OCRResponse(
             success=False,
             error=str(e)
@@ -219,13 +272,20 @@ async def process_image_endpoint(file: UploadFile = File(...), prompt: Optional[
 async def process_pdf_endpoint(file: UploadFile = File(...), prompt: Optional[str] = Form(None)):
     """Process a PDF file with optional custom prompt"""
     try:
+        print(f"[DEBUG] PDF endpoint called for file: {file.filename}")
+        print(f"[DEBUG] Received prompt parameter: {repr(prompt)}")
+        print(f"[DEBUG] Default PROMPT from config: {repr(PROMPT)}")
+        
         # Read PDF data
         pdf_data = await file.read()
+        print(f"[DEBUG] Read {len(pdf_data)} bytes of PDF data")
         
         # Convert PDF to images
         images = pdf_to_images_high_quality(pdf_data, dpi=144)
+        print(f"[DEBUG] Converted PDF to {len(images)} images")
         
         if not images:
+            print(f"[DEBUG] No images extracted from PDF")
             return BatchOCRResponse(
                 success=False,
                 results=[],
@@ -235,24 +295,33 @@ async def process_pdf_endpoint(file: UploadFile = File(...), prompt: Optional[st
         
         # Use provided prompt or default
         use_prompt = prompt if prompt else PROMPT
+        print(f"[DEBUG] PDF endpoint selected prompt: {repr(use_prompt)}")
+        print(f"[DEBUG] Using custom prompt: {prompt is not None}")
+        
+        # Validate and fix prompt format
+        use_prompt = validate_prompt(use_prompt)
         
         # Process each page
         results = []
         for page_num, image in enumerate(tqdm(images, desc="Processing pages")):
             try:
+                print(f"[DEBUG] Processing page {page_num + 1}/{len(images)}")
                 result = process_single_image(image, use_prompt)
                 results.append(OCRResponse(
                     success=True,
                     result=result,
                     page_count=page_num + 1
                 ))
+                print(f"[DEBUG] Page {page_num + 1} processed successfully, output length: {len(result)}")
             except Exception as e:
+                print(f"[ERROR] Page {page_num + 1} failed: {str(e)}")
                 results.append(OCRResponse(
                     success=False,
                     error=f"Page {page_num + 1} error: {str(e)}",
                     page_count=page_num + 1
                 ))
         
+        print(f"[DEBUG] PDF processing complete: {len(results)} pages processed")
         return BatchOCRResponse(
             success=True,
             results=results,
@@ -261,6 +330,7 @@ async def process_pdf_endpoint(file: UploadFile = File(...), prompt: Optional[st
         )
         
     except Exception as e:
+        print(f"[ERROR] PDF endpoint failed: {str(e)}")
         return BatchOCRResponse(
             success=False,
             results=[OCRResponse(success=False, error=str(e))],
