@@ -13,7 +13,8 @@ from typing import List, Optional
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Form
+from typing import Optional
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -23,7 +24,7 @@ from PIL import Image
 from tqdm import tqdm
 
 # Add current directory to Python path
-sys.path.insert(0, '/app/DeepSeek-OCR-master/DeepSeek-OCR-vllm')
+sys.path.insert(0, '/app/DeepSeek-OCR-vllm')
 
 # Set environment variables for vLLM compatibility
 if torch.version.cuda == '11.8':
@@ -32,7 +33,8 @@ os.environ['VLLM_USE_V1'] = '0'
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 
 # Import DeepSeek-OCR components
-from config import MODEL_PATH, INPUT_PATH, OUTPUT_PATH, PROMPT, CROP_MODE, MAX_CONCURRENCY, NUM_WORKERS
+from config import INPUT_PATH, OUTPUT_PATH, PROMPT, CROP_MODE, MAX_CONCURRENCY, NUM_WORKERS
+MODEL_PATH = os.environ.get('MODEL_PATH', 'deepseek-ai/DeepSeek-OCR')
 from deepseek_ocr import DeepseekOCRForCausalLM
 from process.image_process import DeepseekOCRProcessor
 from vllm import LLM, SamplingParams
@@ -139,16 +141,16 @@ def pdf_to_images_high_quality(pdf_data: bytes, dpi: int = 144) -> List[Image.Im
     
     return images
 
-def process_single_image(image: Image.Image) -> str:
-    """Process a single image with DeepSeek-OCR"""
+def process_single_image(image: Image.Image, prompt: str = PROMPT) -> str:
+    """Process a single image with DeepSeek-OCR using the specified prompt"""
     # Create request format for vLLM
     request_item = {
-        "prompt": PROMPT,
+        "prompt": prompt,
         "multi_modal_data": {
             "image": DeepseekOCRProcessor().tokenize_with_images(
-                images=[image], 
-                bos=True, 
-                eos=True, 
+                images=[image],
+                bos=True,
+                eos=True,
                 cropping=CROP_MODE
             )
         }
@@ -186,8 +188,8 @@ async def health_check():
     }
 
 @app.post("/ocr/image", response_model=OCRResponse)
-async def process_image_endpoint(file: UploadFile = File(...)):
-    """Process a single image file"""
+async def process_image_endpoint(file: UploadFile = File(...), prompt: Optional[str] = Form(None)):
+    """Process a single image file with optional custom prompt"""
     try:
         # Read image data
         image_data = await file.read()
@@ -195,8 +197,11 @@ async def process_image_endpoint(file: UploadFile = File(...)):
         # Convert to PIL Image
         image = Image.open(io.BytesIO(image_data)).convert('RGB')
         
+        # Use provided prompt or default
+        use_prompt = prompt if prompt else PROMPT
+        
         # Process with DeepSeek-OCR
-        result = process_single_image(image)
+        result = process_single_image(image, use_prompt)
         
         return OCRResponse(
             success=True,
@@ -211,8 +216,8 @@ async def process_image_endpoint(file: UploadFile = File(...)):
         )
 
 @app.post("/ocr/pdf", response_model=BatchOCRResponse)
-async def process_pdf_endpoint(file: UploadFile = File(...)):
-    """Process a PDF file"""
+async def process_pdf_endpoint(file: UploadFile = File(...), prompt: Optional[str] = Form(None)):
+    """Process a PDF file with optional custom prompt"""
     try:
         # Read PDF data
         pdf_data = await file.read()
@@ -228,11 +233,14 @@ async def process_pdf_endpoint(file: UploadFile = File(...)):
                 filename=file.filename
             )
         
+        # Use provided prompt or default
+        use_prompt = prompt if prompt else PROMPT
+        
         # Process each page
         results = []
         for page_num, image in enumerate(tqdm(images, desc="Processing pages")):
             try:
-                result = process_single_image(image)
+                result = process_single_image(image, use_prompt)
                 results.append(OCRResponse(
                     success=True,
                     result=result,
@@ -261,15 +269,15 @@ async def process_pdf_endpoint(file: UploadFile = File(...)):
         )
 
 @app.post("/ocr/batch")
-async def process_batch_endpoint(files: List[UploadFile] = File(...)):
-    """Process multiple files (images and PDFs)"""
+async def process_batch_endpoint(files: List[UploadFile] = File(...), prompt: Optional[str] = Form(None)):
+    """Process multiple files (images and PDFs) with optional custom prompt"""
     results = []
     
     for file in files:
         if file.filename.lower().endswith('.pdf'):
-            result = await process_pdf_endpoint(file)
+            result = await process_pdf_endpoint(file, prompt)
         else:
-            result = await process_image_endpoint(file)
+            result = await process_image_endpoint(file, prompt)
         
         results.append({
             "filename": file.filename,

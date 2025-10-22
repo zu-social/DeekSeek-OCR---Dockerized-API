@@ -15,6 +15,11 @@ COPY DeepSeek-OCR/DeepSeek-OCR-master/DeepSeek-OCR-vllm/ ./DeepSeek-OCR-vllm/
 # Copy the startup script
 COPY start_server.py .
 
+# Copy the OCR processor and test scripts
+COPY pdf_to_ocr_enhanced.py .
+COPY test_ocr_prompt.py .
+COPY quick_test_ocr.py .
+
 # Copy requirements file and install additional dependencies
 COPY DeepSeek-OCR/requirements.txt .
 
@@ -46,8 +51,11 @@ ENV PYTHONPATH="/app/DeepSeek-OCR-vllm:${PYTHONPATH}"
 # Create directories for outputs
 RUN mkdir -p /app/outputs
 
-# Make the startup script executable
+# Make the scripts executable
 RUN chmod +x /app/start_server.py
+RUN chmod +x /app/pdf_to_ocr_enhanced.py
+RUN chmod +x /app/test_ocr_prompt.py
+RUN chmod +x /app/quick_test_ocr.py
 
 # Expose the API port
 EXPOSE 8000

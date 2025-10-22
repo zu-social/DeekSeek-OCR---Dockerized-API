@@ -64,4 +64,12 @@ echo.
 echo 📋 To view logs, run:
 echo    docker-compose logs -f deepseek-ocr
 echo.
+echo 🔧 New OCR functionality added:
+echo    - Enhanced PDF to OCR processor (pdf_to_ocr_enhanced.py)
+echo    - OCR-specific prompt support: '<image>\nFree OCR.'
+echo    - Test scripts: test_ocr_prompt.py, quick_test_ocr.py
+echo.
+echo 🧪 To test OCR functionality:
+echo    docker-compose exec deepseek-ocr python quick_test_ocr.py
+echo.
 pause

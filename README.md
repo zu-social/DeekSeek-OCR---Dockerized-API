@@ -103,65 +103,215 @@ curl http://localhost:8000/health
 
 ---
 
-## 📄 Using pdf_to_markdown_processor.py
+## 📄 PDF Processing Scripts
 
-The `pdf_to_markdown_processor.py` script provides batch processing capabilities for PDF files in the `data/` directory.
+This project provides several PDF processing scripts, each designed for different use cases. All scripts scan the `data/` directory for PDF files and convert them to Markdown format with different prompts and post-processing options.
 
-### Features
-- Automatically scans the `data/` directory for PDF files
-- Converts each PDF to Markdown format
-- Saves output with the same filename but `.md` extension
-- Provides detailed logging and progress tracking
-- Handles API connection errors gracefully
+### Output Naming Convention
 
-### Usage
+All processors append a suffix to the output filename to indicate the processing method used:
+- **-MD.md**: Markdown conversion (preserves document structure)
+- **-OCR.md**: Plain OCR extraction (raw text without formatting)
+- **-CUSTOM.md**: Custom prompt processing (uses prompt from YAML file)
 
-1. **Prepare PDF Files**
-   ```bash
-   # Place your PDF files in the data directory
-   cp your_document.pdf data/
-   cp another_document.pdf data/
-   ```
+For example, processing `document.pdf` will create:
+- `document-MD.md` (markdown processors)
+- `document-OCR.md` (OCR processor)
+- `document-CUSTOM.md` (custom prompt processors)
 
-2. **Run the Processor**
-   ```bash
-   python pdf_to_markdown_processor.py
-   ```
+---
 
-3. **Check Results**
-   ```bash
-   # View generated markdown files
-   ls data/*.md
-   
-   # View processing log
-   cat pdf_processor.log
-   ```
+### 1. pdf_to_markdown_processor.py
 
-### Output Format
+**Purpose**: Basic PDF to Markdown conversion using the standard markdown prompt
 
-The processor creates Markdown files with page separators:
+**Features**:
+- Uses prompt: `'<image>\n<|grounding|>Convert the document to markdown.'`
+- Converts PDFs to structured Markdown format
+- Simple processing without image extraction
+- Outputs files with `-MD.md` suffix
 
-```markdown
-# Page 1 Content
-... OCR results for page 1 ...
+**Usage**:
+```bash
+# Place PDF files in the data directory
+cp your_document.pdf data/
 
-<--- Page Split --->
+# Run the processor
+python pdf_to_markdown_processor.py
 
-# Page 2 Content
-... OCR results for page 2 ...
+# Check results
+ls data/*-MD.md
 ```
 
-### Configuration
+---
 
-You can modify the processor behavior by editing the script:
+### 2. pdf_to_markdown_processor_enhanced.py
 
-```python
-# Change data folder
-processor = PDFToMarkdownProcessor(data_folder="my_documents")
+**Purpose**: Enhanced PDF to Markdown conversion with post-processing
 
-# Change API URL
-processor = PDFToMarkdownProcessor(api_base_url="http://localhost:8000")
+**Features**:
+- Uses the same markdown prompt as the basic version
+- **Post-processing features**:
+  - Image extraction and saving to `data/images/` folder
+  - Special token cleanup
+  - Reference processing for layout information
+  - Content cleaning and formatting
+- Outputs files with `-MD.md` suffix
+
+**Usage**:
+```bash
+# Place PDF files in the data directory
+cp your_document.pdf data/
+
+# Run the enhanced processor
+python pdf_to_markdown_processor_enhanced.py
+
+# Check results (including extracted images)
+ls data/*-MD.md
+ls data/images/
 ```
+
+---
+
+### 3. pdf_to_ocr_enhanced.py
+
+**Purpose**: Plain OCR text extraction without markdown formatting
+
+**Features**:
+- Uses OCR prompt: `'<image>\nFree OCR.'`
+- Extracts raw text without markdown structure
+- Includes the same post-processing features as the enhanced markdown processor
+- Outputs files with `-OCR.md` suffix
+
+**Usage**:
+```bash
+# Place PDF files in the data directory
+cp your_document.pdf data/
+
+# Run the OCR processor
+python pdf_to_ocr_enhanced.py
+
+# Check results
+ls data/*-OCR.md
+```
+
+---
+
+### 4. pdf_to_custom_prompt.py
+
+**Purpose**: PDF processing with custom prompts (raw output)
+
+**Features**:
+- Uses custom prompt loaded from `custom_prompt.yaml`
+- Returns raw model response without post-processing
+- Ideal for testing and debugging different prompts
+- Outputs files with `-CUSTOM.md` suffix
+
+**Configuration**:
+Edit `custom_prompt.yaml` to customize the prompt:
+```yaml
+# Custom prompt for PDF processing
+prompt: '<image>\n<|grounding|>Convert the document to markdown.'
+```
+
+**Usage**:
+```bash
+# Edit the prompt in custom_prompt.yaml
+nano custom_prompt.yaml
+
+# Place PDF files in the data directory
+cp your_document.pdf data/
+
+# Run the custom prompt processor
+python pdf_to_custom_prompt.py
+
+# Check results
+ls data/*-CUSTOM.md
+```
+
+---
+
+### 5. pdf_to_custom_prompt_enhanced.py
+
+**Purpose**: PDF processing with custom prompts and full post-processing
+
+**Features**:
+- Uses custom prompt loaded from `custom_prompt.yaml`
+- Includes all post-processing features (image extraction, content cleaning, etc.)
+- Combines custom prompts with enhanced output processing
+- Outputs files with `-CUSTOM.md` suffix
+
+**Configuration**:
+Same as `pdf_to_custom_prompt.py` - edit `custom_prompt.yaml` to customize the prompt.
+
+**Usage**:
+```bash
+# Edit the prompt in custom_prompt.yaml
+nano custom_prompt.yaml
+
+# Place PDF files in the data directory
+cp your_document.pdf data/
+
+# Run the enhanced custom prompt processor
+python pdf_to_custom_prompt_enhanced.py
+
+# Check results (including extracted images)
+ls data/*-CUSTOM.md
+ls data/images/
+```
+
+---
+
+## 📊 Comparison of Processors
+
+| Processor | Prompt | Post-Processing | Image Extraction | Output Suffix | Use Case |
+|-----------|--------|-----------------|------------------|---------------|----------|
+| `pdf_to_markdown_processor.py` | Markdown | ❌ | ❌ | `-MD.md` | Quick markdown conversion |
+| `pdf_to_markdown_processor_enhanced.py` | Markdown | ✅ | ✅ | `-MD.md` | Full-featured markdown with images |
+| `pdf_to_ocr_enhanced.py` | Free OCR | ✅ | ✅ | `-OCR.md` | Raw text extraction |
+| `pdf_to_custom_prompt.py` | Custom (YAML) | ❌ | ❌ | `-CUSTOM.md` | Testing custom prompts |
+| `pdf_to_custom_prompt_enhanced.py` | Custom (YAML) | ✅ | ✅ | `-CUSTOM.md` | Custom prompts with full features |
+
+---
+
+## 📋 Common Usage Patterns
+
+### Comparing Different Processing Methods
+
+To compare how different processors handle the same document:
+
+```bash
+# Place a PDF in the data directory
+cp test_document.pdf data/
+
+# Run all processors
+python pdf_to_markdown_processor.py
+python pdf_to_markdown_processor_enhanced.py
+python pdf_to_ocr_enhanced.py
+python pdf_to_custom_prompt.py
+
+# Compare outputs
+ls data/test_document-*.md
+```
+
+### Processing with Custom Prompts
+
+1. Edit `custom_prompt.yaml` with your desired prompt:
+```yaml
+prompt: '<image>\nExtract all tables and format as CSV.'
+```
+
+2. Run the custom processor:
+```bash
+python pdf_to_custom_prompt_enhanced.py
+```
+
+3. Check the specialized output:
+```bash
+cat data/your_document-CUSTOM.md
+```
+
+---
 
 ---
 
@@ -444,15 +594,22 @@ print(f'Model exists: {os.path.exists(MODEL_PATH)}')
 
 ```
 DeepSeek-OCR/
-├── README.md                    # This file
-├── pdf_to_markdown_processor.py # Batch processing script
-├── start_server.py             # FastAPI server
-├── Dockerfile                  # Docker container definition
-├── docker-compose.yml          # Docker compose configuration
-├── build.bat                   # Windows build script
-├── data/                       # Input/output directory for PDFs
-├── models/                     # Model weights directory
-└── DeepSeek-OCR/               # DeepSeek-OCR source code
+├── README.md                              # This file
+├── pdf_to_markdown_processor.py           # Basic markdown conversion
+├── pdf_to_markdown_processor_enhanced.py  # Enhanced markdown with post-processing
+├── pdf_to_ocr_enhanced.py                # OCR text extraction
+├── pdf_to_custom_prompt.py                # Custom prompt processing (raw)
+├── pdf_to_custom_prompt_enhanced.py       # Custom prompt with post-processing
+├── custom_prompt.yaml                     # Configuration for custom prompts
+├── start_server.py                        # FastAPI server
+├── Dockerfile                             # Docker container definition
+├── docker-compose.yml                     # Docker compose configuration
+├── build.bat                              # Windows build script
+├── data/                                  # Input/output directory for PDFs
+│   ├── images/                            # Extracted images (when using enhanced processors)
+│   └── *.md                               # Generated markdown files
+├── models/                                # Model weights directory
+└── DeepSeek-OCR/                          # DeepSeek-OCR source code
 ```
 
 ---
