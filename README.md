@@ -26,7 +26,7 @@ python pdf_to_markdown_processor.py
 
 ### Hardware Requirements
 - **NVIDIA GPU** with CUDA 11.8+ support
-- **GPU Memory**: Minimum 16GB VRAM (recommended: 40GB+ A100)
+- **GPU Memory**: Minimum 12GB VRAM (Model takes ~9GB)
 - **System RAM**: Minimum 32GB (recommended: 64GB+)
 - **Storage**: 50GB+ free space for model and containers
 
